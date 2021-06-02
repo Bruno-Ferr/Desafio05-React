@@ -31,21 +31,11 @@ interface PostPagination {
 
 interface HomeProps {
   postsPagination: PostPagination;
+  preview: boolean;
 }
 
-export default function Home({ postsPagination }:  HomeProps) {
-  const formattedPost = postsPagination.results.map(post => {
-    return {
-      ...post,
-      first_publication_date: format(new Date(post.first_publication_date), 'dd MMM yyyy', 
-        {
-          locale: ptBR,
-        }
-      ),
-    };
-  });
-
-  const [posts, setPosts] = useState(formattedPost)
+export default function Home({ postsPagination, preview }:  HomeProps) {
+  const [posts, setPosts] = useState(postsPagination.results)
   const [nextPage, setNextPage] = useState(postsPagination.next_page)
 
   async function handleNextPost(): Promise<void> {
@@ -80,40 +70,48 @@ export default function Home({ postsPagination }:  HomeProps) {
       </Head>
       <Header />
       <main className={commonStyles.container}>
-      <div className={styles.container}>
-        {posts.map(post => {
-          return (
-            <Link href={`/post/${post.uid}`} key={post.uid}>
-            <a>
-              <strong>{post.data.title}</strong>
-              <p>{post.data.subtitle}</p>
-              <div className={styles.infos}>
-                <div className={styles.createdAt}>
-                  <FiCalendar />
-                  <time>{post.first_publication_date}</time>
+        <div className={styles.container}>
+          {posts.map(post => {
+            return (
+              <Link href={`/post/${post.uid}`} key={post.uid}>
+              <a>
+                <strong>{post.data.title}</strong>
+                <p>{post.data.subtitle}</p>
+                <div className={styles.infos}>
+                  <div className={styles.createdAt}>
+                    <FiCalendar />
+                    <time>{post.first_publication_date}</time>
+                  </div>
+                  <div className={styles.author}>
+                    <FiUser />
+                    {post.data.author}
+                  </div> 
                 </div>
-                <div className={styles.author}>
-                  <FiUser />
-                  {post.data.author}
-                </div> 
-              </div>
-            </a>
-          </Link>
-          );   
-        })}
+              </a>
+            </Link>
+            );   
+          })}
 
-        {nextPage && 
-          <button type="button" onClick={handleNextPost}>
-            Carregar mais posts
-          </button>
-        }
-      </div>    
+          {nextPage && 
+            <button type="button" onClick={handleNextPost}>
+              Carregar mais posts
+            </button>
+          }
+
+          {preview && 
+            <aside>
+              <Link href="/api/exit-preview">
+                <a>Sair do modo preview</a>
+              </Link>
+            </aside>
+          } 
+        </div>    
       </main>
     </>
   );
 }
 
-export const getStaticProps: GetStaticProps = async () => {
+export const getStaticProps: GetStaticProps = async ({ preview = false, previewData }) => {
   const prismic = getPrismicClient();
 
   const postsResponse = await prismic.query([
@@ -121,12 +119,16 @@ export const getStaticProps: GetStaticProps = async () => {
   ], {
     orderings: '[post.last_publication_date desc]',
     pageSize: 1,
+    ref: previewData?.ref ?? null,
   });
 
   const posts = postsResponse.results.map(post => {
     return {
       uid: post.uid,
-      first_publication_date: post.first_publication_date,
+      first_publication_date: format(new Date(post.first_publication_date), 'dd MMM yyyy', 
+      {
+        locale: ptBR,
+      }),
       data: {
         title: post.data.title,
         author: post.data.author,
@@ -141,7 +143,7 @@ export const getStaticProps: GetStaticProps = async () => {
   }
 
   return {
-    props: { postsPagination },
+    props: { postsPagination, preview },
     revalidate: 60 * 30     // 30 minutos
   }
 };
